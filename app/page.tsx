@@ -279,7 +279,7 @@ export default function Home() {
           <AssetForm
             onSubmit={handleEditAsset}
             onCancel={() => setEditingAsset(null)}
-            initialData={editingAsset}
+            initialData={{ ...editingAsset, purchasePrice: editingAsset.purchasePrice.toString() }}
             isEditing={true}
           />
         )}
