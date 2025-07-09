@@ -16,6 +16,9 @@ import { IssuanceForm } from '@/components/issuance-form';
 import { IssuanceTable } from '@/components/issuance-table';
 import { IssuanceDetails } from '@/components/issuance-details';
 import { DashboardStats } from '@/components/dashboard-stats';
+import { DeleteConfirmationDialog } from '@/components/delete-confirmation-dialog';
+import { ReturnConfirmationDialog } from '@/components/return-confirmation-dialog';
+import { SuccessNotification } from '@/components/success-notification';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Send, Package } from 'lucide-react';
@@ -30,6 +33,22 @@ export default function Home() {
   const [viewingAsset, setViewingAsset] = useState<Asset | null>(null);
   const [viewingIssuance, setViewingIssuance] = useState<AssetIssuance | null>(null);
   const [selectedAssetForIssuance, setSelectedAssetForIssuance] = useState<string>('');
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    assetId: string;
+    assetName: string;
+  }>({ isOpen: false, assetId: '', assetName: '' });
+  const [returnDialog, setReturnDialog] = useState<{
+    isOpen: boolean;
+    issuanceId: string;
+    assetName: string;
+    issuedTo: string;
+  }>({ isOpen: false, issuanceId: '', assetName: '', issuedTo: '' });
+  const [successNotification, setSuccessNotification] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({ isOpen: false, title: '', message: '' });
 
   if (isLoading) {
     return (
@@ -55,6 +74,11 @@ export default function Home() {
     };
     setAssets([...assets, newAsset]);
     setShowAssetForm(false);
+    setSuccessNotification({
+      isOpen: true,
+      title: 'Asset Added',
+      message: `${newAsset.name} has been successfully added to the inventory.`
+    });
   };
 
   const handleEditAsset = (formData: AssetFormData) => {
@@ -71,12 +95,29 @@ export default function Home() {
       asset.id === editingAsset.id ? updatedAsset : asset
     ));
     setEditingAsset(null);
+    setSuccessNotification({
+      isOpen: true,
+      title: 'Asset Updated',
+      message: `${updatedAsset.name} has been successfully updated.`
+    });
   };
 
-  const handleDeleteAsset = (id: string) => {
-    if (confirm('Are you sure you want to delete this asset?')) {
-      setAssets(assets.filter(asset => asset.id !== id));
-    }
+  const handleDeleteAsset = (asset: Asset) => {
+    setDeleteDialog({
+      isOpen: true,
+      assetId: asset.id,
+      assetName: asset.name
+    });
+  };
+
+  const confirmDeleteAsset = () => {
+    const assetName = assets.find(a => a.id === deleteDialog.assetId)?.name || 'Asset';
+    setAssets(assets.filter(asset => asset.id !== deleteDialog.assetId));
+    setSuccessNotification({
+      isOpen: true,
+      title: 'Asset Deleted',
+      message: `${assetName} has been successfully deleted from the inventory.`
+    });
   };
 
   const handleEditClick = (asset: Asset) => {
@@ -119,35 +160,55 @@ export default function Home() {
     setIssuances([...issuances, newIssuance]);
     setShowIssuanceForm(false);
     setSelectedAssetForIssuance('');
+    setSuccessNotification({
+      isOpen: true,
+      title: 'Asset Issued',
+      message: `${asset.name} has been successfully issued to ${formData.issuedTo}.`
+    });
   };
 
   const handleReturnAsset = (issuanceId: string) => {
-    if (confirm('Mark this asset as returned?')) {
-      const issuance = issuances.find(i => i.id === issuanceId);
-      if (!issuance) return;
+    const issuance = issuances.find(i => i.id === issuanceId);
+    if (!issuance) return;
 
-      // Update issuance status
-      const updatedIssuances = issuances.map(i => 
-        i.id === issuanceId 
-          ? { 
-              ...i, 
-              status: 'returned' as const, 
-              actualReturnDate: new Date().toISOString().split('T')[0],
-              updatedAt: new Date().toISOString()
-            }
-          : i
-      );
+    setReturnDialog({
+      isOpen: true,
+      issuanceId,
+      assetName: issuance.assetName,
+      issuedTo: issuance.issuedTo
+    });
+  };
 
-      // Update asset assignment back to unassigned
-      const updatedAssets = assets.map(a => 
-        a.id === issuance.assetId 
-          ? { ...a, assignedTo: 'Unassigned', lastUpdated: new Date().toISOString() }
-          : a
-      );
+  const confirmReturnAsset = () => {
+    const issuance = issuances.find(i => i.id === returnDialog.issuanceId);
+    if (!issuance) return;
 
-      setIssuances(updatedIssuances);
-      setAssets(updatedAssets);
-    }
+    // Update issuance status
+    const updatedIssuances = issuances.map(i => 
+      i.id === returnDialog.issuanceId 
+        ? { 
+            ...i, 
+            status: 'returned' as const, 
+            actualReturnDate: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString()
+          }
+        : i
+    );
+
+    // Update asset assignment back to unassigned
+    const updatedAssets = assets.map(a => 
+      a.id === issuance.assetId 
+        ? { ...a, assignedTo: 'Unassigned', lastUpdated: new Date().toISOString() }
+        : a
+    );
+
+    setIssuances(updatedIssuances);
+    setAssets(updatedAssets);
+    setSuccessNotification({
+      isOpen: true,
+      title: 'Asset Returned',
+      message: `${issuance.assetName} has been successfully returned and is now available.`
+    });
   };
 
   const handleQuickIssue = (assetId: string) => {
@@ -249,6 +310,30 @@ export default function Home() {
             onClose={() => setViewingIssuance(null)}
           />
         )}
+
+        <DeleteConfirmationDialog
+          isOpen={deleteDialog.isOpen}
+          onClose={() => setDeleteDialog({ isOpen: false, assetId: '', assetName: '' })}
+          onConfirm={confirmDeleteAsset}
+          title="Delete Asset"
+          description="Are you sure you want to delete this asset? This will permanently remove it from your inventory."
+          itemName={deleteDialog.assetName}
+        />
+
+        <ReturnConfirmationDialog
+          isOpen={returnDialog.isOpen}
+          onClose={() => setReturnDialog({ isOpen: false, issuanceId: '', assetName: '', issuedTo: '' })}
+          onConfirm={confirmReturnAsset}
+          assetName={returnDialog.assetName}
+          issuedTo={returnDialog.issuedTo}
+        />
+
+        <SuccessNotification
+          isOpen={successNotification.isOpen}
+          onClose={() => setSuccessNotification({ isOpen: false, title: '', message: '' })}
+          title={successNotification.title}
+          message={successNotification.message}
+        />
       </div>
     </div>
   );

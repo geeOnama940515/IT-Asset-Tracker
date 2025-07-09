@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 interface AssetTableProps {
   assets: Asset[];
   onEdit: (asset: Asset) => void;
-  onDelete: (id: string) => void;
+  onDelete: (asset: Asset) => void;
   onView: (asset: Asset) => void;
   onIssue?: (assetId: string) => void;
 }
@@ -176,7 +176,7 @@ export function AssetTable({ assets, onEdit, onDelete, onView, onIssue }: AssetT
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => onDelete(asset.id)}
+                          onClick={() => onDelete(asset)}
                           className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
