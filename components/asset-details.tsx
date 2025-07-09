@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 interface AssetDetailsProps {
   asset: Asset;
   onClose: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
 }
 
 export function AssetDetails({ asset, onClose, onEdit }: AssetDetailsProps) {
@@ -187,9 +187,11 @@ export function AssetDetails({ asset, onClose, onEdit }: AssetDetailsProps) {
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={onEdit}>
-              Edit Asset
-            </Button>
+            {onEdit && (
+              <Button onClick={onEdit}>
+                Edit Asset
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

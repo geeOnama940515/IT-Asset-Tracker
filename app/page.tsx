@@ -2,19 +2,49 @@
 
 import { useState } from 'react';
 import { Asset, AssetFormData } from '@/types/asset';
+import { AssetIssuance, IssuanceFormData } from '@/types/issuance';
 import { mockAssets } from '@/lib/mock-data';
+import { mockIssuances } from '@/lib/issuance-data';
+import { useAuth } from '@/contexts/auth-context';
+import { hasPermission } from '@/lib/auth';
+import { LoginForm } from '@/components/login-form';
+import { Header } from '@/components/header';
 import { AssetTable } from '@/components/asset-table';
 import { AssetForm } from '@/components/asset-form';
 import { AssetDetails } from '@/components/asset-details';
+import { IssuanceForm } from '@/components/issuance-form';
+import { IssuanceTable } from '@/components/issuance-table';
+import { IssuanceDetails } from '@/components/issuance-details';
 import { DashboardStats } from '@/components/dashboard-stats';
 import { Button } from '@/components/ui/button';
-import { Plus, Package } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Send, Package } from 'lucide-react';
 
 export default function Home() {
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>(mockAssets);
-  const [showForm, setShowForm] = useState(false);
+  const [issuances, setIssuances] = useState<AssetIssuance[]>(mockIssuances);
+  const [showAssetForm, setShowAssetForm] = useState(false);
+  const [showIssuanceForm, setShowIssuanceForm] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [viewingAsset, setViewingAsset] = useState<Asset | null>(null);
+  const [viewingIssuance, setViewingIssuance] = useState<AssetIssuance | null>(null);
+  const [selectedAssetForIssuance, setSelectedAssetForIssuance] = useState<string>('');
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <Package className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginForm />;
+  }
 
   const handleAddAsset = (formData: AssetFormData) => {
     const newAsset: Asset = {
@@ -24,7 +54,7 @@ export default function Home() {
       lastUpdated: new Date().toISOString()
     };
     setAssets([...assets, newAsset]);
-    setShowForm(false);
+    setShowAssetForm(false);
   };
 
   const handleEditAsset = (formData: AssetFormData) => {
@@ -58,38 +88,129 @@ export default function Home() {
     setViewingAsset(asset);
   };
 
+  const handleIssueAsset = (formData: IssuanceFormData) => {
+    const asset = assets.find(a => a.id === formData.assetId);
+    if (!asset) return;
+
+    const newIssuance: AssetIssuance = {
+      id: Date.now().toString(),
+      assetId: formData.assetId,
+      assetName: asset.name,
+      issuedTo: formData.issuedTo,
+      issuedBy: user?.name || 'Unknown',
+      issuedDate: new Date().toISOString().split('T')[0],
+      expectedReturnDate: formData.expectedReturnDate || undefined,
+      status: 'issued',
+      purpose: formData.purpose,
+      notes: formData.notes,
+      conditions: formData.conditions,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Update asset assignment
+    const updatedAssets = assets.map(a => 
+      a.id === formData.assetId 
+        ? { ...a, assignedTo: formData.issuedTo, lastUpdated: new Date().toISOString() }
+        : a
+    );
+
+    setAssets(updatedAssets);
+    setIssuances([...issuances, newIssuance]);
+    setShowIssuanceForm(false);
+    setSelectedAssetForIssuance('');
+  };
+
+  const handleReturnAsset = (issuanceId: string) => {
+    if (confirm('Mark this asset as returned?')) {
+      const issuance = issuances.find(i => i.id === issuanceId);
+      if (!issuance) return;
+
+      // Update issuance status
+      const updatedIssuances = issuances.map(i => 
+        i.id === issuanceId 
+          ? { 
+              ...i, 
+              status: 'returned' as const, 
+              actualReturnDate: new Date().toISOString().split('T')[0],
+              updatedAt: new Date().toISOString()
+            }
+          : i
+      );
+
+      // Update asset assignment back to unassigned
+      const updatedAssets = assets.map(a => 
+        a.id === issuance.assetId 
+          ? { ...a, assignedTo: 'Unassigned', lastUpdated: new Date().toISOString() }
+          : a
+      );
+
+      setIssuances(updatedIssuances);
+      setAssets(updatedAssets);
+    }
+  };
+
+  const handleQuickIssue = (assetId: string) => {
+    setSelectedAssetForIssuance(assetId);
+    setShowIssuanceForm(true);
+  };
+
+  const canCreate = hasPermission(user?.role || 'employee', 'create');
+  const canIssue = hasPermission(user?.role || 'employee', 'issue');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary rounded-lg">
-              <Package className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">IT Asset Tracker</h1>
-              <p className="text-gray-600">Manage and monitor your IT assets efficiently</p>
-            </div>
-          </div>
-          <Button onClick={() => setShowForm(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Asset
-          </Button>
-        </div>
-
+        <Header />
         <DashboardStats assets={assets} />
 
-        <AssetTable
-          assets={assets}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteAsset}
-          onView={handleViewClick}
-        />
+        <Tabs defaultValue="assets" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="assets">Assets</TabsTrigger>
+            <TabsTrigger value="issuances">Issuances</TabsTrigger>
+          </TabsList>
 
-        {showForm && (
+          <TabsContent value="assets" className="space-y-6">
+            <div className="flex justify-end gap-2">
+              {canCreate && (
+                <Button onClick={() => setShowAssetForm(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Asset
+                </Button>
+              )}
+            </div>
+
+            <AssetTable
+              assets={assets}
+              onEdit={canCreate ? handleEditClick : () => {}}
+              onDelete={canCreate ? handleDeleteAsset : () => {}}
+              onView={handleViewClick}
+              onIssue={canIssue ? handleQuickIssue : undefined}
+            />
+          </TabsContent>
+
+          <TabsContent value="issuances" className="space-y-6">
+            <div className="flex justify-end gap-2">
+              {canIssue && (
+                <Button onClick={() => setShowIssuanceForm(true)} className="gap-2">
+                  <Send className="h-4 w-4" />
+                  Issue Asset
+                </Button>
+              )}
+            </div>
+
+            <IssuanceTable
+              issuances={issuances}
+              onReturn={canIssue ? handleReturnAsset : () => {}}
+              onView={(issuance) => setViewingIssuance(issuance)}
+            />
+          </TabsContent>
+        </Tabs>
+
+        {showAssetForm && (
           <AssetForm
             onSubmit={handleAddAsset}
-            onCancel={() => setShowForm(false)}
+            onCancel={() => setShowAssetForm(false)}
           />
         )}
 
@@ -106,7 +227,26 @@ export default function Home() {
           <AssetDetails
             asset={viewingAsset}
             onClose={() => setViewingAsset(null)}
-            onEdit={() => handleEditClick(viewingAsset)}
+            onEdit={canCreate ? () => handleEditClick(viewingAsset) : undefined}
+          />
+        )}
+
+        {showIssuanceForm && (
+          <IssuanceForm
+            assets={assets}
+            onSubmit={handleIssueAsset}
+            onCancel={() => {
+              setShowIssuanceForm(false);
+              setSelectedAssetForIssuance('');
+            }}
+            selectedAssetId={selectedAssetForIssuance}
+          />
+        )}
+
+        {viewingIssuance && (
+          <IssuanceDetails
+            issuance={viewingIssuance}
+            onClose={() => setViewingIssuance(null)}
           />
         )}
       </div>

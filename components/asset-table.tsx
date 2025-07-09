@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
+import { Search, Filter, Edit, Trash2, Eye, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AssetTableProps {
@@ -16,9 +16,10 @@ interface AssetTableProps {
   onEdit: (asset: Asset) => void;
   onDelete: (id: string) => void;
   onView: (asset: Asset) => void;
+  onIssue?: (assetId: string) => void;
 }
 
-export function AssetTable({ assets, onEdit, onDelete, onView }: AssetTableProps) {
+export function AssetTable({ assets, onEdit, onDelete, onView, onIssue }: AssetTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -153,6 +154,17 @@ export function AssetTable({ assets, onEdit, onDelete, onView }: AssetTableProps
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        {onIssue && asset.status === 'active' && asset.assignedTo === 'Unassigned' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onIssue(asset.id)}
+                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                            title="Issue Asset"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
